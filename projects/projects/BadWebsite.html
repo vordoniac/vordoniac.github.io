@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<!Quesawdel>
+<!Not working counter: 5>
+<!Actual fixes: 2>
+<html>
+
+<head>
+<link href='https://fonts.googleapis.com/css?family=Fredoka One' rel='stylesheet'>
+<link href='https://fonts.googleapis.com/css?family=Aldrich' rel='stylesheet'>
+<style>
+body {background-color: rgb(60, 60, 60);}
+</style>
+</head>
+<body id='theBody' style='margin: 0; height: 100%; overflow: hidden'>
+    <svg id='mainSvg' width = '1920' height = '1080' style="position: absolute;z-index: 0;">
+        <defs>
+            <clipPath id="questBox">
+                <rect id="questBoxRect" x="15" y="15" width="40" height="40" />
+            </clipPath> <!Remember to check the orange quests!>
+        </defs>
+        <g id='main'>
+        <rect id='sideBar' x="0" y="0" width="100" height="150" style="fill:grey;" />
+        <rect id='divideLine' x="0" y="0" width="100" height="2" style="fill:grey;" />
+        <rect id='descBox' x="0" y="0" width="100" height="100" style="fill:grey;" />
+        <text id='menu0' x="100" y="100" fill="white" style="font-size: 
+        40px;font-family: Lucida Sans Unicode, Lucida Grande, sans-serif;">Quests</text>
+        <rect id='addBox' x="15" y="15" width="40" height="40" fill='rgba(0,0,0,0)'/>
+        <rect id='selectBar' x="100" y="100" width="100" height="100" fill='white' />
+        <g id='questList' style="fill:rgb(191, 191, 191);clip-path: url(#questBox);" >
+            
+        </g>
+        
+        </g>
+        <rect id='clickBox' x="0" y="0" width="100" height="100" fill=rgba(55,55,55,0) onmousedown='mouseDown(event)' onmouseup='mouseUp(event)' />
+    </svg>
+    <div id='nonSvg' style="position: fixed;z-index: 1;fill:red;font-size:40px;">
+        
+    </div>
+    <script>
+        
+        var svg;
+        var sideBar;
+        var screenRatio;
+        var questList;
+        var addMenuSpace;
+        var selectBar = {questNum:1,scroll:0};
+        var screenState;
+        
+        var questSpace;
+        var questHeight;
+        var questWidth;
+        var questX;
+        
+        var element; //A temp variable used to store elements temporarilly before they are inserted into the svg
+        var element2; //A second temp variable used to store elements temporarilly before they are inserted into the svg
+        var previousVals = {windowW:0,windowH:0,mousePressedL:false,mousePressedR:false,mousePressedM:false,questListLength:0,keyVals:[],editingQuestActive:false,inMenuActive:false,screenState:-1}; //Used to store the state of variables in the previous frame. This is mostly used to detect changes.
+        
+        var mouseVals = {mousePressedLCoord:[0,0],mousePressedMCoord:[0,0],mousePressedRCoord:[0,0],mouseReleaseLCoord:[0,0],mouseReleaseMCoord:[0,0],mouseReleaseRCoord:[0,0]};
+        var keyVals = [];
+        
+        var mouseX;
+        var mouseY;
+        
+        var timers = {menuTimer:0,questSlideTimer:0};
+        var booleans = {closingAddMenu:false,openingAddMenu:false,slidingQuest:false,mousePressedL:false,mousePressedR:false,mousePressedM:false, realAddQuest:false,questListChange:true,typeBoxFocus:false};
+        var editingQuest = {active:false,title:{select:false,active:false},desc:{select:false,active:false},reward:{select:false,active:false},punish:{select:false,active:false}};
+        var inMenu = {active:false,option:0};
+        
+        
+        init();
+        setInterval(frame, 17); //About 60fps
+        
+        function frame()
+        {
+            resizeMainSvg();
+        }
+        
+        function init() 
+        {
+            //Prevents the right click menu
+            if (document.addEventListener) { // IE >= 9; other browsers
+                document.addEventListener('contextmenu', function(event) {
+                    event.preventDefault();}, false);
+            } else { // IE < 9
+                document.attachEvent('oncontextmenu', function() {
+                    window.event.returnValue = false;});
+            }
+            
+            svg = document.getElementById('mainSvg');
+            sideBar = document.getElementById('sideBar');
+            questList = [{text:"Quest1",desc:"WHEEE",reward:"Eee but no eee?!",yPlus:0,color:'red',id:""},{text:"Quest2",desc:"",reward:"",yPlus:0,color:'green',id:""}];
+            screenState = 0;
+            
+            window.addEventListener('keydown', keyDown);
+            window.addEventListener('keyup', keyUp);
+            
+            window.addEventListener('resize', resizeMainSvg);
+            window.addEventListener('orientationchange', resizeMainSvg);
+            resizeMainSvg();
+        }
+        
+        function mouseDown(event)
+        {
+            if(event.button == 0) 
+            {
+                booleans.mousePressedL = true;
+                mouseVals.mousePressedLCoord = [event.clientX,event.clientY];
+            }
+            if(event.button == 1) 
+            {
+                booleans.mousePressedM = true;
+                mouseVals.mousePressedMCoord = [event.clientX,event.clientY];
+            }
+            if(event.button == 2) 
+            {
+                
+                booleans.mousePressedR = true;
+                mouseVals.mousePressedRCoord = [event.clientX,event.clientY];
+            }
+             
+            //if(booleans.mousePressedL || booleans.mousePressedR || booleans.mousePressedM)
+            //document.getElementById('clickBox').setAttributeNS(null, 'fill', 'rgba(55,55,55,0)');
+        }
+        
+        function mouseUp(event)
+        {
+            if(event.button == 0) 
+            {
+                booleans.mousePressedL = false;
+                mouseVals.mouseReleaseLCoord = [event.clientX,event.clientY];
+            }
+            if(event.button == 1)
+            {
+                booleans.mousePressedM = false;
+                mouseVals.mouseReleaseMCoord = [event.clientX,event.clientY];
+            }
+            if(event.button == 2) 
+            {
+                booleans.mousePressedR = false;
+                mouseVals.mouseReleaseRCoord = [event.clientX,event.clientY];
+            }
+            //if(!booleans.mousePressedL && !booleans.mousePressedR && !booleans.mousePressedM)
+            //document.getElementById('clickBox').setAttributeNS(null, 'fill', 'rgba(55,55,55,0.5)');
+        }
+        
+        function keyDown(event)
+        {
+            if(!isInArray(keyVals,event.which))
+            {
+                keyVals.push(event.which);
+            }
+        }
+        
+        function keyUp(event)
+        {
+            var temp = [];
+            temp = [];
+            for(i = 0; i<keyVals; i++)
+            {
+                if(keyVals[i] != null && !(keyVals[i] == event.which))
+                {
+                    temp.push(keyVals[i]);
+                }
+            }
+            keyVals = temp;
+        }
+        
+        function isInArray(array,n)
+        {
+            for(i = 0; i<array; i++)
+            {
+                if(array[i] != null && array[i] == n)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function pointInRect(point,rect) //'point' is a 2 length array [x,y], rect is an svg rect element.
+        {
+            if(point[0] >= rect.getAttributeNS(null, 'x') && point[1] >= rect.getAttributeNS(null, 'y') && point[0] <= parseFloat(rect.getAttributeNS(null, 'x')) + parseFloat(rect.getAttributeNS(null, 'width')) && point[1] <= parseFloat(rect.getAttributeNS(null, 'y')) + parseFloat(rect.getAttributeNS(null, 'height')))
+            {
+                return true;
+            }
+            else
+            {
+                return false;        
+            }
+        }
+        
+        function pointOnQuest(point)
+        {
+            for(i = 0; i < questList.length; i++)
+            {
+                if(pointInRect(point, document.getElementById("quest" + i))) return i;
+            } 
+            return -1;
+        }
+        
+        function pushAt(array, item, index)
+        {
+            var temp = [];
+            if(greatestNum(array.length,index+1) == array.length)
+            {
+                for(i = 0; i<array.length+1; i++)
+                {
+                    if(i == index)
+                    {
+                        temp.push(item);   
+                    }
+                    else if(i < index)
+                    {
+                        temp.push(array[i]);
+                    }
+                    else if(i > index)
+                    {
+                        temp.push(array[i-1]);
+                    } 
+                }
+            }
+            else
+            {
+                for(i = 0; i<index+1; i++)
+                {
+                    if(i == index)
+                    {
+                        temp.push(item);   
+                    }
+                    else if(i < array.length)
+                    {
+                        temp.push(array[i]);
+                    }
+                    else if(i >= array.length)
+                    {
+                        temp.push(null);
+                    }
+                }
+            }
+            return temp;
+        }
+        
+        function deleteIndex(array, index)
+        {
+            var temp = [];
+            for(i = 0; i<array.length+1; i++)
+            {
+                if(i == index)
+                {
+                      
+                }
+                else if(i < index)
+                {
+                    temp.push(array[i]);
+                }
+                else if(i > index)
+                {
+                    temp.push(array[i-1]);
+                } 
+            }
+            return temp;
+        }
+        
+        function greatestNum(num1, num2) //Two numbers.
+        {
+            if(num1 > num2)
+            {
+                return num1;
+            }
+            if(num2 > num1)
+            {
+                return num2;        
+            }
+            return num1;
+        }
+        
+        function getLineBreaks(text, rowMax)
+        {
+            var temp = [];
+            var lastSpace = -1;
+            var text0 = text.substring(0,text.length);
+            while(text0.length > 0)
+            {
+                for(r = 0; r < rowMax; r++)
+                {
+                    if(r >= text0.length)
+                    {
+                        lastSpace = -2;
+                        break;
+                    }
+                    else if(text0.charAt(r) == ' ') 
+                    {
+                        lastSpace = r;
+                    }
+                        
+                }
+                if(lastSpace == -2)
+                {
+                    temp.push(text0);
+                    text0 = "";
+                }
+                else
+                {
+                    temp.push(text0.substring(0,lastSpace));
+                    text0 = text0.substring(lastSpace+1,text0.length);
+                    lastSpace = -1;
+                }
+            }
+            return temp;
+        }
+        
+        function getAttribute(id, attribute)
+        {
+            if(!document.getElementById(id)) return null;
+            return document.getElementById(id).getAttributeNS(null,attribute);
+        }
+        
+        function resizeMainSvg()
+        {
+            svg.setAttributeNS(null, 'width', window.innerWidth); //Max width 
+            svg.setAttributeNS(null, 'height', window.innerHeight); //Max height
+            document.getElementById('clickBox').setAttributeNS(null, 'width', window.innerWidth);
+            document.getElementById('clickBox').setAttributeNS(null, 'height', window.innerHeight);
+            screenW = svg.getAttributeNS(null, 'width');
+            screenH = svg.getAttributeNS(null, 'height');         
+            resizeSvgStuff();
+        }
+        
+        function resizeSvgStuff()
+        {
+            if(screenState != previousVals.screenState) makeScreen();
+            sideBar.setAttributeNS(null, 'height', svg.getAttributeNS(null, 'height'));
+            sideBar.setAttributeNS(null, 'width', screenW/10); 
+            
+            var sideBarW = sideBar.getAttributeNS(null,'width');
+            
+            document.getElementById('menu0').setAttributeNS(null, 'x', sideBarW);
+            document.getElementById('menu0').setAttributeNS(null, 'style', "font-size:"+ screenW/30 +"px;font-family: Lucida Sans Unicode, Lucida Grande, sans-serif;");
+            
+            document.getElementById('divideLine').setAttributeNS(null, 'x', parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)));
+            document.getElementById('divideLine').setAttributeNS(null, 'width', screenW/2.3);
+            document.getElementById('divideLine').setAttributeNS(null, 'y', screenW/13);
+            document.getElementById('divideLine').setAttributeNS(null, 'height', screenW/400);
+            
+            document.getElementById('descBox').setAttributeNS(null, 'x', parseFloat(sideBarW) + parseFloat(screenW*(6.2/10)));
+            document.getElementById('descBox').setAttributeNS(null, 'y', screenW/14);
+            document.getElementById('descBox').setAttributeNS(null, 'width', screenW/3);
+            document.getElementById('descBox').setAttributeNS(null, 'height', parseFloat(screenH)-parseFloat(screenW/6));
+            
+            if(document.getElementById('descTitle'))
+            {
+                document.getElementById('main').removeChild(document.getElementById('descTitle'));
+            }
+            element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            element.setAttributeNS(null, 'transform', 'translate('+(parseFloat(getAttribute('descBox','x')) + parseFloat(getAttribute('descBox','x')/100))+','+ (getAttribute('descBox','y')*1.4) + ') scale('+ parseFloat(screenW/500) +')');
+            element.setAttributeNS(null, 'fill', 'white');
+            element.setAttributeNS(null, 'id', 'descTitle');
+            element.setAttributeNS(null, 'style', 'font-family:"Aldrich";');
+            if(questList.length != 0)
+            {
+                element.appendChild(document.createTextNode("  " + questList[selectBar.questNum].text));
+            }
+            else
+            {
+                element.appendChild(document.createTextNode("  "));
+            }
+            document.getElementById('main').appendChild(element);
+            
+            if(document.getElementById('descMain'))
+            {
+                document.getElementById('main').removeChild(document.getElementById('descMain'));
+            }
+            element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            element.setAttributeNS(null, 'transform', 'translate('+(getAttribute('descBox','x'))+','+ (getAttribute('descBox','y')*1.8) + ') scale('+ parseFloat(screenW/1200) +')');
+            element.setAttributeNS(null, 'fill', 'white');
+            element.setAttributeNS(null, 'id', 'descMain');
+            element.setAttributeNS(null, 'style', 'font-family:"Arial";');
+            //element.appendChild(document.createTextNode(" - " + questList[selectBar.questNum].desc));
+            if(questList.length != 0)
+            {
+                for(i = 0; i<getLineBreaks(questList[selectBar.questNum].desc,42).length; i++)
+                {
+                    //alert(getLineBreaks("EEE",10)[i]);
+                    element2 = document.createElementNS('http://www.w3.org/2000/svg',"tspan");
+                    element2.setAttributeNS(null, 'x', getAttribute('descBox','x')/60);
+                    element2.setAttributeNS(null, 'y', i*17);
+                    element2.appendChild(document.createTextNode(getLineBreaks(questList[selectBar.questNum].desc,42)[i]));
+                    element.appendChild(element2);
+                }
+            }
+            else
+            {
+                element.appendChild(document.createTextNode("  "));
+            }
+            document.getElementById('main').appendChild(element);
+            
+            if(document.getElementById('rewardBox'))
+            {
+                document.getElementById('main').removeChild(document.getElementById('rewardBox'));
+            }
+            element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            element.setAttributeNS(null, 'transform', 'translate('+(parseFloat(getAttribute('descBox','x')) + parseFloat(getAttribute('descBox','x')/100))+','+ (parseFloat(getAttribute('descBox','y')) + parseFloat(getAttribute('descBox','height')) - 3*parseFloat(screenW/30)) + ') scale('+ parseFloat(screenW/1000) +')');
+            element.setAttributeNS(null, 'fill', 'white');
+            element.setAttributeNS(null, 'id', 'rewardBox');
+            element.setAttributeNS(null, 'style', 'font-family:"Aldrich";');
+            element.appendChild(document.createTextNode("  Reward: "));
+            if(questList.length != 0)
+            {
+                for(i = 0; i<getLineBreaks(questList[selectBar.questNum].reward,42).length; i++)
+                {
+                    //alert(getLineBreaks("EEE",10)[i]);
+                    element2 = document.createElementNS('http://www.w3.org/2000/svg',"tspan");
+                    element2.setAttributeNS(null, 'x', getAttribute('descBox','x')/100);
+                    element2.setAttributeNS(null, 'y', (i+1)*17);
+                    element2.appendChild(document.createTextNode(getLineBreaks(questList[selectBar.questNum].reward,42)[i]));
+                    element.appendChild(element2);
+                }
+            }
+            else
+            {
+                element.appendChild(document.createTextNode("  "));
+            }
+            document.getElementById('main').appendChild(element);
+            
+            questSpace = parseFloat(screenW/50);
+            questHeight = parseFloat(screenH/7);
+            questWidth = parseFloat(screenW/2.6);
+            questX = parseFloat(sideBarW) + parseFloat(screenW*(1.7/10));
+            
+            document.getElementById('questBoxRect').setAttributeNS(null, 'x', parseFloat(sideBarW) + parseFloat(screenW*(1.7/10)));
+            document.getElementById('questBoxRect').setAttributeNS(null, 'y', parseFloat(screenW/13) + parseFloat(screenW/400));
+            document.getElementById('questBoxRect').setAttributeNS(null, 'width', parseFloat(screenW/2.6));
+            document.getElementById('questBoxRect').setAttributeNS(null, 'height', parseFloat(screenH) - parseFloat(screenW/13) - parseFloat(screenW/400));
+            
+            document.getElementById('addBox').setAttributeNS(null, 'x', parseFloat(sideBarW) + parseFloat(screenW*(1.7/10)));
+            document.getElementById('addBox').setAttributeNS(null, 'y', parseFloat(screenW/13) + parseFloat(screenW/400));
+            document.getElementById('addBox').setAttributeNS(null, 'width', parseFloat(screenW/2.6));
+            document.getElementById('addBox').setAttributeNS(null, 'height', parseFloat(screenH) - parseFloat(screenW/13) - parseFloat(screenW/400)); 
+            
+            if(booleans.questListChange)
+            {
+                for(i = 0; i<previousVals.questListLength; i++)
+                {
+                    if(document.getElementById("quest" + i))
+                    {
+                        document.getElementById('questList').removeChild(document.getElementById("quest" + i));
+                    }
+                    if(document.getElementById("questText" + i))
+                    {
+                        document.getElementById('questList').removeChild(document.getElementById("questText" + i));
+                    }
+                }
+                for (i = 0; i < questList.length; i++) 
+                { 
+                    element = document.createElementNS('http://www.w3.org/2000/svg','rect');
+                    element.setAttributeNS(null, 'x', questX);
+                    element.setAttributeNS(null, 'y', parseFloat(screenW/13) + (i+1)*questSpace + i*questHeight);
+                    element.setAttributeNS(null, 'width', questWidth);
+                    element.setAttributeNS(null, 'height', questHeight);
+                    element.setAttributeNS(null, 'id', "quest" + i);
+                    element.setAttributeNS(null, 'fill', questList[i].color);
+                    questList[i].id = "quest" + i;
+                    document.getElementById('questList').appendChild(element);
+                }
+                for (i = 0; i < questList.length; i++) 
+                { 
+                    element = document.createElementNS('http://www.w3.org/2000/svg','text');
+                    element.setAttributeNS(null, 'transform', 'translate('+(questX + questSpace)+','+ document.getElementById("quest" + i).getAttributeNS(null,"y") + ') scale(2)');
+                    element.setAttributeNS(null, 'id', "questText" + i);
+                    element.setAttributeNS(null, 'fill', 'white');
+                    element.appendChild(document.createTextNode(questList[i].text));
+                    document.getElementById('questList').appendChild(element);
+                }
+                previousVals.questListLength = questList.length;
+                booleans.questListChange = false;
+            }
+            
+            for (i = 0; i < questList.length; i++) 
+            { 
+                document.getElementById("quest" + i).setAttributeNS(null, 'x', questX);
+                document.getElementById("quest" + i).setAttributeNS(null, 'y', parseFloat(screenW/13) + (i+1)*questSpace + i*questHeight);
+                document.getElementById("quest" + i).setAttributeNS(null, 'width', questWidth);
+                document.getElementById("quest" + i).setAttributeNS(null, 'height', questHeight);
+                document.getElementById("quest" + i).setAttributeNS(null, 'id', "quest" + i);
+                document.getElementById("quest" + i).setAttributeNS(null, 'fill', questList[i].color);
+            }
+            
+            document.getElementById('selectBar').setAttributeNS(null, 'x', parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)));
+            //document.getElementById('selectBar').setAttributeNS(null, 'y', parseFloat(document.getElementById('quest' + selectBar.questNum).getAttributeNS(null, 'y')) + questList[selectBar.questNum].yPlus);
+            document.getElementById('selectBar').setAttributeNS(null, 'y', (parseFloat(screenW/13) + 2*questSpace + 1*questHeight));
+            document.getElementById('selectBar').setAttributeNS(null, 'width', parseFloat(screenW/300));
+            document.getElementById('selectBar').setAttributeNS(null, 'height', questHeight); 
+            
+            for (i = 0; i < questList.length; i++) 
+            { 
+                document.getElementById("quest" + i).setAttributeNS(null, 'y', parseFloat(document.getElementById("quest" + i).getAttributeNS(null, 'y')) + selectBar.scroll);
+            }
+            
+            questBoxNormalize(parseFloat(screenW/13), questSpace, questHeight); //Makes sure the boxes are exactly at the height they are supposed to be.
+            
+            //////Check booleans//////
+            if(inMenu.active)
+            {
+                if(!previousVals.inMenuActive)
+                {
+                    previousVals.inMenuActive = true;
+                }
+                if(!isInArray(keyVals,39) && isInArray(previousVals.keyVals,39)) //Right arrow
+                {
+                    inMenu.active = false;
+                }
+                if(inMenu.option == 0)
+                {
+                    document.getElementById('menu0').setAttributeNS(null, 'style', "font-size:"+ screenW/30 +"px;font-family: Lucida Sans Unicode, Lucida Grande, sans-serif;text-decoration: underline;");
+                }
+            }
+            else
+            {               
+                if(document.getElementById('addMenu') && !booleans.openingAddMenu && !booleans.closingAddMenu && !booleans.slidingQuest)
+                {
+                    for(i = 0; i < questList.length; i++) 
+                    {
+                        element = document.getElementById("quest" + i);
+                        if(parseFloat(element.getAttributeNS(null,'y')) > parseFloat(document.getElementById('addMenu').getAttributeNS(null,'y')))
+                        {
+                            document.getElementById("quest" + i).setAttributeNS(null,'y', parseFloat(element.getAttributeNS(null,'y')) + parseFloat(questList[i].yPlus));
+                        }  
+                    }
+                }
+
+                if(booleans.openingAddMenu)
+                {
+                    growAddMenu(questHeight);
+                }
+                if(booleans.closingAddMenu)
+                {
+                    shrinkAddMenu(questHeight);
+                }
+                if(booleans.slidingQuest)
+                {
+                    slideNewQuest(parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)) + parseFloat(screenW/2.3), questX,questSpace);    
+                }
+                if(booleans.realAddQuest)
+                {
+                    addQuest();
+                }
+                if(editingQuest.active)
+                {
+                    if(!previousVals.editingQuestActive)
+                    {
+                        editingQuest.title.select = true;
+                        editingQuest.desc.select = false;
+                        previousVals.editingQuestActive = true;
+                        element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        element.setAttributeNS(null, 'x', document.getElementById('descBox').getAttributeNS(null, 'x'));
+                        element.setAttributeNS(null, 'y', document.getElementById('descBox').getAttributeNS(null, 'y'));
+                        element.setAttributeNS(null, 'width', document.getElementById('descBox').getAttributeNS(null, 'width'));
+                        element.setAttributeNS(null, 'height', parseFloat(screenW/30));
+                        element.setAttributeNS(null, 'fill', 'rgba(232, 232, 232, .3)');
+                        element.setAttributeNS(null, 'id', 'editHighlight');
+                        document.getElementById('main').appendChild(element);
+                    }
+                    else
+                    {
+                        if(document.getElementById('editHighlight'))
+                        {
+                            if(editingQuest.title.select)
+                            {
+                                document.getElementById('editHighlight').setAttributeNS(null, 'y', getAttribute('descBox','y'));
+                                document.getElementById('editHighlight').setAttributeNS(null, 'height', parseFloat(screenW/30));
+                            }
+                            else if(editingQuest.desc.select)
+                            {
+                                document.getElementById('editHighlight').setAttributeNS(null, 'y', parseFloat(getAttribute('descBox','y')) + parseFloat(screenW/30));
+                                document.getElementById('editHighlight').setAttributeNS(null, 'height', getAttribute('descBox','height') - 4*parseFloat(screenW*(3.8/100)));
+                            }
+                            else if(editingQuest.reward.select)
+                            {
+                                document.getElementById('editHighlight').setAttributeNS(null, 'y', parseFloat(getAttribute('descBox','y')) + parseFloat(screenW/30)+(getAttribute('descBox','height')-4*parseFloat(screenW*(3.8/100))));
+                                document.getElementById('editHighlight').setAttributeNS(null, 'height', getAttribute('descBox','height') - 4*parseFloat(screenW*(5.3/100)));
+                            }
+                        }
+                    }
+                }
+                if(previousVals.editingQuestActive && !editingQuest.active || !editingQuest.active)
+                {
+                    previousVals.editingQuestActive = false;
+                    if(document.getElementById('editHighlight'))
+                    {
+                        document.getElementById('main').removeChild(document.getElementById('editHighlight'));
+                    }
+                }
+                if(!booleans.typeBoxFocus && document.getElementById('typeBox'))
+                {
+                    if(getAttribute('typeBox','x') == 1)
+                    {
+                        questList[selectBar.questNum].text = document.getElementById("typeBox").value;
+                        editingQuest.title.active = false;
+                        editingQuest.title.select = false;
+                    }
+                    else if(getAttribute('typeBox','x') == 2)
+                    {
+                        questList[selectBar.questNum].desc = document.getElementById("typeBox").value;
+                        editingQuest.desc.active = false;
+                        editingQuest.desc.select = false;
+                    }
+                    else if(getAttribute('typeBox','x') == 3)
+                    {
+                        questList[selectBar.questNum].reward = document.getElementById("typeBox").value;
+                        editingQuest.reward.active = false;
+                        editingQuest.reward.select = false;
+                    }
+                    document.getElementById('nonSvg').removeChild(document.getElementById('typeBox'));
+                    booleans.questListChange = true;
+
+                    if(editingQuest.active) editingQuest.active = false;
+                }
+                //////
+                for (i = 0; i < questList.length; i++) 
+                { 
+                    document.getElementById("questText" + i).setAttributeNS(null, 'transform', 'translate('+(questX + questSpace)+','+ (parseFloat(document.getElementById("quest" + i).getAttributeNS(null,"y")) + questHeight/2) + ') scale(2)');
+                }
+
+                //////Check for clicks, presses, and releases//////
+
+
+                if(document.getElementById('test'))
+                {
+                    document.getElementById('main').removeChild(document.getElementById('test'));
+                }
+
+                element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                element.setAttributeNS(null, 'x', 300);
+                element.setAttributeNS(null, 'y', 100);
+                element.setAttributeNS(null, 'fill', 'white');
+                element.setAttributeNS(null, 'id', 'test');
+                element.appendChild(document.createTextNode(editingQuest.title.select));
+                document.getElementById('main').appendChild(element);
+
+                if(!booleans.mousePressedR && previousVals.mousePressedR && pointInRect(mouseVals.mousePressedRCoord,document.getElementById('addBox')) && !booleans.slidingQuest && !booleans.openingAddMenu && pointOnQuest(mouseVals.mousePressedRCoord) == -1)
+                {
+                    drawAddMenu();
+                }
+                if(!booleans.mousePressedL && previousVals.mousePressedL && document.getElementById('addMenu') && pointInRect(mouseVals.mousePressedLCoord,document.getElementById('addMenu')))
+                {
+                    drawNewQuest(parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)) + parseFloat(screenW/2.3),parseFloat(getYQuestSlide(document.getElementById('addMenu').getAttributeNS(null,'y'))) + parseFloat(questSpace) + parseFloat(screenH/7.0001),questWidth,questHeight);
+                }
+                if(!booleans.mousePressedL && previousVals.mousePressedL && pointOnQuest(mouseVals.mousePressedLCoord) != -1 && !editingQuest.active && !booleans.slidingQuest)
+                {
+                    //selectBar.questNum = parseFloat(pointOnQuest(mouseVals.mousePressedLCoord));
+                    selectBar.scroll += parseFloat(document.getElementById('quest' + selectBar.questNum).getAttributeNS(null,'y')) - parseFloat(document.getElementById('quest' + parseFloat(pointOnQuest(mouseVals.mousePressedLCoord))).getAttributeNS(null,'y'));
+                    selectBar.questNum = parseFloat(pointOnQuest(mouseVals.mousePressedLCoord));
+                }
+
+                if(!isInArray(keyVals,13) && isInArray(previousVals.keyVals,13)) //Enter
+                {
+                    if(!editingQuest.active)
+                    {
+                        if(questList != 0)
+                        {
+                            drawNewQuest(parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)) + parseFloat(screenW/2.3), parseFloat(document.getElementById("quest" + selectBar.questNum).getAttributeNS(null,'y')) + questHeight + questSpace,questWidth,questHeight);
+                        }
+                        else
+                        {
+                            drawNewQuest(parseFloat(sideBarW) + parseFloat(screenW*(1.5/10)) + parseFloat(screenW/2.3), parseFloat(document.getElementById("selectBar").getAttributeNS(null,'y')),questWidth,questHeight);
+                        }
+                    }
+                    else if(editingQuest.active)
+                    {
+                        if(editingQuest.title.select)
+                        {
+                            if(!editingQuest.title.active)
+                            {
+                                editingQuest.title.active = true;
+                                element = document.createElement('input');
+                                element.setAttributeNS(null, 'x', 1);
+                                element.setAttributeNS(null, 'y', 1);
+                                element.setAttributeNS(null, 'style', 'position:absolute;margin-left: '+getAttribute('descBox','x') + 'px;margin-top: '+getAttribute('descBox','y') + 'px;font-family:"Aldrich";color:black;font-size:'+(100*parseFloat(screenW/1200))+'%;');
+                                element.setAttributeNS(null, 'type', 'text');
+                                element.setAttributeNS(null, 'value', questList[selectBar.questNum].text);
+                                element.setAttributeNS(null, 'fill', 'white');
+                                element.setAttributeNS(null, 'onblur', 'booleans.typeBoxFocus = false');
+                                element.setAttributeNS(null, 'id', 'typeBox');
+                                document.getElementById('nonSvg').appendChild(element);
+                                document.getElementById('typeBox').focus();
+                                booleans.typeBoxFocus = true;
+                                //alert(getAttribute('typeBox','x'));
+                            }
+                            else
+                            {
+                                booleans.typeBoxFocus = false;
+                                if(editingQuest.active) editingQuest.active = false;
+                            }
+                        }
+                        if(editingQuest.desc.select)
+                        {
+                            if(!editingQuest.desc.active)
+                            {
+                                editingQuest.desc.active = true;
+                                element = document.createElement('textarea');
+                                element.setAttributeNS(null, 'x', 2);
+                                element.setAttributeNS(null, 'y', 2);
+                                element.setAttributeNS(null, 'style', 'position:absolute;margin-left: '+getAttribute('descBox','x') + 'px;margin-top: '+(parseFloat(getAttribute('descBox','y')) + parseFloat(screenW/30)) + 'px;font-family:"Arial";color:black;font-size:'+(100*parseFloat(screenW/3300))+'%;');
+                                element.appendChild(document.createTextNode(questList[selectBar.questNum].desc));
+                                element.setAttributeNS(null, 'fill', 'white');
+                                element.setAttributeNS(null, 'cols', 100);
+                                element.setAttributeNS(null, 'rows', 40);
+                                element.setAttributeNS(null, 'onblur', 'booleans.typeBoxFocus = false');
+                                element.setAttributeNS(null, 'id', 'typeBox');
+                                document.getElementById('nonSvg').appendChild(element);
+                                while(document.getElementById('typeBox').scrollHeight > parseFloat(getAttribute('descBox','height')) - 4*parseFloat(screenW/30))
+                                {
+                                    document.getElementById('typeBox').setAttributeNS(null, 'rows', parseFloat(getAttribute('typeBox','rows'))-1);
+                                }
+                                while(document.getElementById('typeBox').scrollWidth >= parseFloat(getAttribute('descBox','width')))
+                                {
+                                    document.getElementById('typeBox').setAttributeNS(null, 'cols', parseFloat(getAttribute('typeBox','cols'))-1);
+                                }
+                                document.getElementById('typeBox').setAttributeNS(null, 'cols', parseFloat(getAttribute('typeBox','cols'))-10);
+                                document.getElementById('typeBox').focus();
+                                booleans.typeBoxFocus = true;
+                            }
+                        }
+                        if(editingQuest.reward.select)
+                        {
+                            if(!editingQuest.reward.active)
+                            {
+                                editingQuest.reward.active = true;
+                                element = document.createElement('textarea');
+                                element.setAttributeNS(null, 'x', 3);
+                                element.setAttributeNS(null, 'y', 3);
+                                element.setAttributeNS(null, 'style', 'position:absolute;margin-left: '+getAttribute('descBox','x') + 'px;margin-top: '+(parseFloat(getAttribute('descBox','y')) + parseFloat(screenW/30) + parseFloat(getAttribute('descBox','height')) - 2.5*parseFloat(screenW*(5.3/100))) + 'px;font-family:"Arial";color:black;font-size:'+(100*parseFloat(screenW/3300))+'%;');
+                                element.appendChild(document.createTextNode(questList[selectBar.questNum].desc));
+                                element.setAttributeNS(null, 'fill', 'white');
+                                element.setAttributeNS(null, 'cols', 100);
+                                element.setAttributeNS(null, 'rows', 40);
+                                element.setAttributeNS(null, 'onblur', 'booleans.typeBoxFocus = false');
+                                element.setAttributeNS(null, 'id', 'typeBox');
+                                document.getElementById('nonSvg').appendChild(element);
+                                while(document.getElementById('typeBox').scrollHeight > getAttribute('descBox','height') - 4.5*parseFloat(screenW*(5.3/100)))
+                                {
+                                    document.getElementById('typeBox').setAttributeNS(null, 'rows', parseFloat(getAttribute('typeBox','rows'))-1);
+                                }
+                                while(document.getElementById('typeBox').scrollWidth >= parseFloat(getAttribute('descBox','width')))
+                                {
+                                    document.getElementById('typeBox').setAttributeNS(null, 'cols', parseFloat(getAttribute('typeBox','cols'))-1);
+                                }
+                                document.getElementById('typeBox').setAttributeNS(null, 'cols', parseFloat(getAttribute('typeBox','cols'))-10);
+                                document.getElementById('typeBox').focus();
+                                booleans.typeBoxFocus = true;
+                            }
+                        }
+                    }
+                }
+
+                if(!isInArray(keyVals,27) && isInArray(previousVals.keyVals,27)) //Esc
+                {
+                    if(document.getElementById('typeBox'))
+                    {
+                        if(getAttribute('typeBox','x') == 1 && editingQuest.title.active) editingQuest.title.active = false;
+                        if(getAttribute('typeBox','y') == 2 && editingQuest.desc.active) editingQuest.desc.active = false;
+                    }
+                    if(editingQuest.active) editingQuest.active = false;
+                    booleans.typeBoxFocus = false;
+                }
+
+                if(!isInArray(keyVals,69) && isInArray(previousVals.keyVals,69)) //E
+                {
+                    if(!editingQuest.title.active && !editingQuest.desc.active)
+                    {
+                        if(!editingQuest.active)
+                        {
+                            editingQuest.active = true;
+                        }
+                        else 
+                        {
+                            editingQuest.active = false;  
+                        }
+                    }
+                }
+
+                if(!isInArray(keyVals,40) && isInArray(previousVals.keyVals,40)) //Down arrow
+                {
+                    if(!editingQuest.active)
+                    {
+                        if(parseFloat(pointOnQuest([parseFloat(getAttribute('quest'+selectBar.questNum,'x'))+1,parseFloat(getAttribute('quest'+selectBar.questNum,'y'))+questHeight+questSpace+1])) != -1)
+                        {
+                            selectBar.scroll -= questHeight + questSpace;
+                            selectBar.questNum = parseFloat(pointOnQuest([parseFloat(getAttribute('quest'+selectBar.questNum,'x'))+1,parseFloat(getAttribute('quest'+selectBar.questNum,'y'))+questHeight+questSpace+1]));
+                        }
+                    }
+                    else if(editingQuest.active)
+                    {
+                        if(editingQuest.title.select && !editingQuest.title.active)
+                        {
+                            editingQuest.title.select = false;
+                            editingQuest.desc.select = true;
+                        }
+                        else if(editingQuest.desc.select && !editingQuest.desc.active)
+                        {
+                            editingQuest.desc.select = false;
+                            editingQuest.reward.select = true;
+                        }
+                    }
+                }
+                if(!isInArray(keyVals,38) && isInArray(previousVals.keyVals,38)) //Up arrow
+                {
+                    if(!editingQuest.active)
+                    {
+                        if(parseFloat(pointOnQuest([parseFloat(getAttribute('quest'+selectBar.questNum,'x'))+1,parseFloat(getAttribute('quest'+selectBar.questNum,'y'))-questHeight])) != -1)
+                        {
+                            selectBar.scroll += questHeight + questSpace;
+                            selectBar.questNum =           parseFloat(pointOnQuest([parseFloat(getAttribute('quest'+selectBar.questNum,'x'))+1,parseFloat(getAttribute('quest'+selectBar.questNum,'y'))-questHeight]));
+                        }
+                    }
+                    else if(editingQuest.active)
+                    {
+                        if(editingQuest.desc.select && !editingQuest.desc.active)
+                        {
+                            editingQuest.desc.select = false;
+                            editingQuest.title.select = true;
+                        }
+                        else if(editingQuest.reward.select && !editingQuest.reward.active)
+                        {
+                            editingQuest.reward.select = false;
+                            editingQuest.desc.select = true;
+                        }
+                    }
+                }
+                if(!isInArray(keyVals,37) && isInArray(previousVals.keyVals,37)) //Left arrow
+                {
+                    if(!editingQuest.active)
+                    {
+                        inMenu.active = true;
+                    }
+                }
+                if(!isInArray(keyVals,8) && isInArray(previousVals.keyVals,8)) //Backspace
+                {
+                    if(!editingQuest.active)
+                    {
+                        deleteQuest(selectBar.questNum);
+                    }
+                }
+            }
+            //////Set Previouses//////
+            previousVals.mousePressedL = booleans.mousePressedL;
+            previousVals.mousePressedM = booleans.mousePressedM;
+            previousVals.mousePressedR = booleans.mousePressedR;
+            previousVals.keyVals = keyVals;
+            
+        }
+        
+        function getYQuestSlide(addMenuY) //Returns the greatest y value of quest that is less than or equal to the input value.
+        {
+            addMenuY = parseFloat(addMenuY);
+            var greatistY = 0;
+            for (i = 0; i < questList.length; i++) 
+            { 
+                if(parseFloat(document.getElementById("quest" + i).getAttributeNS(null,'y'))<=addMenuY && parseFloat(document.getElementById("quest" + i).getAttributeNS(null,'y')) > greatistY)
+                {
+                    greatistY = parseFloat(document.getElementById("quest" + i).getAttributeNS(null,'y'));
+                }
+            }
+            if(greatistY != 0) return greatistY;
+            //return greatistY;
+            return parseFloat(document.getElementById("divideLine").getAttributeNS(null,'y')) - parseFloat(document.getElementById("quest0").getAttributeNS(null,'height'));
+        }
+        
+        function drawAddMenu()
+        {
+            if(document.getElementById('addMenu'))
+            {
+                timers.menuTimer = 10;
+                booleans.closingAddMenu = true;
+            }
+            else
+            {
+                //document.getElementById('addBox').setAttributeNS(null, 'height', 0);
+                element = document.createElementNS('http://www.w3.org/2000/svg','rect');
+                element.setAttributeNS(null, 'width', 100);
+                element.setAttributeNS(null, 'height', 1);
+                element.setAttributeNS(null, 'fill', 'rgba(239, 239, 239,1)');
+                element.setAttributeNS(null, 'x', mouseVals.mousePressedRCoord[0]);
+                element.setAttributeNS(null, 'y', 0);
+                for(i = 0; i < questList.length; i++) 
+                {
+                    if(parseFloat(document.getElementById("quest" + i).getAttributeNS(null,'y')) < mouseVals.mousePressedRCoord[1])
+                    {
+                        //Set y value to the y value plus the height of the above quest, plus 1/5 of the space between quests.
+                        element.setAttributeNS(null, 'y', parseFloat(document.getElementById("quest" + i).getAttributeNS(null, 'y')) + parseFloat(document.getElementById("quest" + i).getAttributeNS(null, 'height')) + parseFloat(screenW/250));
+                    }  
+                }
+                if(parseFloat(element.getAttributeNS(null, 'y')) == 0) //If y is unchanged after the for loop
+                {
+                    element.setAttributeNS(null, 'y', parseFloat(screenW/13) + parseFloat(screenW/250)); //Set y value to the y value of the divide line plus 1/5 of the space between quests.
+                }
+                element.setAttributeNS(null, 'id', 'addMenu');
+                //svg.appendChild(element);
+                document.getElementById('main').appendChild(element);
+                booleans.openingAddMenu = true;
+            }
+        }
+        
+        function growAddMenu(maxHeight) //'maxHeight' is the value that the menu is told to grow to.
+        {
+            //document.getElementById('addBox').setAttributeNS(null, 'height', 0);
+            maxHeight = parseFloat(maxHeight);
+            document.getElementById('addBox').setAttributeNS(null, 'height', 0);
+            document.getElementById('addMenu').setAttributeNS(null, 'height', smoothGrowth(timers.menuTimer,10,maxHeight));
+            if(parseFloat(screenW/50) - parseFloat(document.getElementById('addMenu').getAttributeNS(null, 'height')) - parseFloat(screenW/250) <= parseFloat(screenW/250))
+            {
+            for(i = 0; i < questList.length; i++) 
+            {
+                element = document.getElementById("quest" + i);
+                if(parseFloat(element.getAttributeNS(null,'y')) > parseFloat(document.getElementById('addMenu').getAttributeNS(null,'y')))
+                {
+                    questList[i].yPlus = smoothGrowth(timers.menuTimer,10,maxHeight);
+                    document.getElementById("quest" + i).setAttributeNS(null,'y', parseFloat(element.getAttributeNS(null,'y')) + parseFloat(questList[i].yPlus));
+                }  
+            }
+            }
+            timers.menuTimer = timers.menuTimer + 1;
+            if(timers.menuTimer == 11 || document.getElementById('addMenu').getAttributeNS(null,'height') >= maxHeight)
+            {
+                booleans.openingAddMenu = false;
+            }
+            
+        }
+        
+        function shrinkAddMenu(maxHeight) //Here, 'maxHeight' specifies the height that is being shrunk from.
+        {
+            maxHeight = parseFloat(maxHeight);
+            document.getElementById('addBox').setAttributeNS(null, 'height', 0);
+            document.getElementById('addMenu').setAttributeNS(null, 'height', smoothGrowth(timers.menuTimer,10,maxHeight));
+            if(parseFloat(screenW/50) - parseFloat(document.getElementById('addMenu').getAttributeNS(null, 'height')) - parseFloat(screenW/250) <= parseFloat(screenW/250))
+            {
+            for(i = 0; i < questList.length; i++) 
+            {
+                element = document.getElementById("quest" + i);
+                if(parseFloat(element.getAttributeNS(null,'y')) > parseFloat(document.getElementById('addMenu').getAttributeNS(null,'y')))
+                {
+                    questList[i].yPlus = smoothGrowth(timers.menuTimer,10,maxHeight);
+                    document.getElementById("quest" + i).setAttributeNS(null,'y', parseFloat(element.getAttributeNS(null,'y')) + parseFloat(questList[i].yPlus));
+                }  
+            }
+            }
+            timers.menuTimer = timers.menuTimer - 1;
+            if(timers.menuTimer == -1)
+            {
+                booleans.closingAddMenu = false;    
+                document.getElementById('main').removeChild(document.getElementById('addMenu'));
+            }
+        }
+        
+        function smoothGrowth(currentFrame, frames, amplitude)
+        {
+            if(currentFrame<0)
+            {
+                return 0;
+            }
+            else
+            {
+                return Math.round((-amplitude/2)*Math.cos((currentFrame*Math.PI)/(frames)) + Math.abs(amplitude/2));
+            }
+            //return Math.cos(parseFloat(currentFrame)*Math.PI);
+        }
+        
+        function drawNewQuest(x,y,width,height)
+        {   
+            //alert(y);
+            x = parseFloat(x);
+            y = parseFloat(y);
+            height = parseFloat(height);
+            width = parseFloat(width);
+            
+            element = document.createElementNS('http://www.w3.org/2000/svg','rect');
+            element.setAttributeNS(null, 'x', x); //Divide line x plus divide line width.
+            element.setAttributeNS(null, 'y', y);
+            element.setAttributeNS(null, 'height', height); //Normal quest height
+            element.setAttributeNS(null, 'width', width); //Normal quest width
+            element.setAttributeNS(null, 'id', 'slidingQuest');
+            
+            document.getElementById('questList').appendChild(element);
+            booleans.slidingQuest = true;
+        }
+        
+        function slideNewQuest(initialX, finalX, questSpacing) //'finalX' is the x coordinate the quest is sliding to. 'initialX' is the initial x coordinate.
+        {
+            questSpacing = parseFloat(questSpacing);
+            finalX = parseFloat(finalX);
+            intitialX = parseFloat(initialX);
+            
+            document.getElementById('slidingQuest').setAttributeNS(null, 'x', initialX - parseFloat(smoothGrowth(timers.questSlideTimer,30,initialX - finalX))); //Initial position minus the smoothgrowth of the max of the intial position minus the normal quest x coordinate.
+            
+            for(i = 0; i < questList.length; i++) 
+            {
+                element = document.getElementById("quest" + i);
+                if(timers.questSlideTimer <= 15 && parseFloat(element.getAttributeNS(null,'y')) >= parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'y')))
+                {
+                    //alert(questList[i].yPlus);
+                    //questList[i].yPlus = parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'height')) + parseFloat(smoothGrowth(timers.questSlideTimer,30, questSpacing));
+                    questList[i].yPlus = questList[i].yPlus + parseFloat(smoothGrowth(timers.questSlideTimer,15, questSpacing + parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'height')))) - parseFloat(smoothGrowth(timers.questSlideTimer-1,15, questSpacing + parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'height'))));;
+                    //alert(questList[i].yPlus);
+                    document.getElementById("quest" + i).setAttributeNS(null,'y', parseFloat(element.getAttributeNS(null,'y')) + parseFloat(questList[i].yPlus));
+                }
+                else if(timers.questSlideTimer > 15 && parseFloat(element.getAttributeNS(null,'y')) >= parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'y')))
+                {
+                    document.getElementById("quest" + i).setAttributeNS(null,'y', parseFloat(element.getAttributeNS(null,'y')) + parseFloat(questList[i].yPlus));
+                }
+            }
+            if(document.getElementById('addMenu'))
+            {
+                document.getElementById('addMenu').setAttributeNS(null, 'fill', 'rgba(239, 239, 239,' + (100 -parseFloat(smoothGrowth(timers.questSlideTimer, 30, 100)))/100 + ')');
+            }
+            timers.questSlideTimer = timers.questSlideTimer + 1;
+            if(timers.questSlideTimer >= 31)
+            {
+                if(document.getElementById('addMenu'))
+                {
+                    document.getElementById('main').removeChild(document.getElementById('addMenu'));  
+                }
+                for(i = 0; i < questList.length; i++) 
+                {
+                    element = document.getElementById("quest" + i);
+                    if(parseFloat(element.getAttributeNS(null,'y')) >=parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'y')))
+                    {
+                        questList[i].yPlus = questList[i].yPlus - parseFloat(smoothGrowth(timers.questSlideTimer,30, questSpacing + parseFloat(document.getElementById('slidingQuest').getAttributeNS(null,'height'))));
+                    }
+                }
+                timers.menuTimer = 0;
+                timers.questSlideTimer = 0;
+                booleans.slidingQuest = false;
+                booleans.realAddQuest = true;
+            }
+        }
+        
+        function addQuest()
+        {   
+            //questList = pushAt(questList, {text:"",yPlus:0,desc:"",color:"rgb(" + Math.floor(Math.random() * 255) + "," + Math.floor(Math.random() * 255) + "," + Math.floor(Math.random() * 255) + ")"}, selectBar.questNum+1);
+            questList = pushAt(questList, {text:"",yPlus:0,desc:"",reward:"",color:"grey",id:""}, selectBar.questNum+1);
+            //alert(questList.length);
+            //questList.push({text:"Quest"+questList.length,yPlus:0});
+            document.getElementById('questList').removeChild(document.getElementById('slidingQuest'));
+            booleans.questListChange = true;
+            booleans.realAddQuest = false;
+            
+            selectBar.questNum = selectBar.questNum + 1;
+            selectBar.scroll -= parseFloat(screenH/7) + parseFloat(screenW/50);//QuestHeight plus QuestSpace
+            
+            editingQuest.active = true;
+            editingQuest.title.active = true;
+            element = document.createElement('input');
+            element.setAttributeNS(null, 'x', 1);
+            element.setAttributeNS(null, 'y', 1);
+            element.setAttributeNS(null, 'style', 'position:absolute;margin-left: '+getAttribute('descBox','x') + 'px;margin-top: '+getAttribute('descBox','y') + 'px;font-family:"Aldrich";color:black;font-size:'+(100*parseFloat(screenW/1200))+'%;');
+            element.setAttributeNS(null, 'type', 'text');
+            element.setAttributeNS(null, 'value', questList[selectBar.questNum].text);
+            element.setAttributeNS(null, 'fill', 'white');
+            element.setAttributeNS(null, 'onblur', 'booleans.typeBoxFocus = false');
+            element.setAttributeNS(null, 'id', 'typeBox');
+            document.getElementById('nonSvg').appendChild(element);
+            document.getElementById('typeBox').focus();
+            booleans.typeBoxFocus = true;
+            
+        }
+        
+        function questBoxNormalize(questStartY, questSpace, questHeight)
+        {
+            var temp = 0;
+            for (i = 0; i < questList.length; i++) 
+            {
+                temp = document.getElementById("quest" + i).getAttributeNS(null, 'y')
+                temp = temp - (questStartY + questSpace);
+                temp = temp/(questSpace + questHeight);
+                temp = Math.round(temp);
+                temp = temp * (questSpace + questHeight);
+                temp = temp + (questStartY + questSpace);
+                document.getElementById("quest" + i).setAttributeNS(null, 'y', temp);
+            }
+        }
+        
+        function deleteQuest(questNum)
+        {
+            var temp = [];
+            for(i = 0; i<questList.length; i++)
+            {
+                if(questList[i].id.search(questNum + "") != 5)
+                {
+                    temp.push(questList[i]);
+                }
+                else
+                {
+                    if(questNum == questList.length-1)
+                    {
+                        moveSelectBar(1);       
+                    }        
+                }
+            }
+            questList = [];
+            for(i = 0; i<temp.length; i++)
+            {
+                questList.push(temp[i]);
+            }
+            booleans.questListChange = true;
+        }
+        
+        function moveSelectBar(amount) //Negative is down. Positive is up
+        {
+            selectBar.scroll = selectBar.scroll + questHeight + questSpace;
+            selectBar.questNum = selectBar.questNum - amount;
+        }
+        
+        function makeScreen()
+        {
+            document.getElementById("mainSvg")
+        }
+        
+    </script>
+</body>
+
+</html>

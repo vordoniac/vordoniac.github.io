@@ -1,0 +1,26 @@
+import bpy
+
+obj = bpy.context.active_object
+
+polyCnt = 0
+file = open("objectDataNew.txt", "w")
+file.write("")
+file = open("objectDataNew.txt", "a")
+
+for f in obj.data.polygons:
+	file.write("[")
+	file.write(str(polyCnt))
+	file.write("]\n")
+	slot = obj.material_slots[f.material_index]
+	mat = slot.material
+	if mat is not None:
+		file.write(str(mat.diffuse_color))
+		file.write("\n")
+	else:
+		file.write("No mat in slot")
+		file.write("\n")
+		
+	for idx in f.vertices:
+		file.write(str(obj.data.vertices[idx].co))
+		file.write("\n")
+	polyCnt = polyCnt + 1
